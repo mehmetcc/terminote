@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{Connection, OptionalExtension, Row, params};
 use uuid::Uuid;
 
-pub(crate) struct Note {
+pub struct Note {
     pub id: Uuid,
     pub title: String,
     pub content: String,
@@ -28,8 +28,7 @@ pub struct NoteClient {
 }
 
 impl NoteClient {
-    pub fn new(db_path: &str) -> Result<Self, rusqlite::Error> {
-        let connection = Connection::open(db_path)?;
+    pub fn new(connection: Connection) -> Result<Self, rusqlite::Error> {
         connection.execute_batch(
             "PRAGMA foreign_keys = ON;
              PRAGMA journal_mode = WAL;

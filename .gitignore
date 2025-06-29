@@ -1,6 +1,14 @@
 /target
 
 .idea
+
+# sqlite
+data
 notes.db
 notes.db-shm
 notes.db-wal
+
+# Python
+*.pyc
+__pycache__
+.venv
