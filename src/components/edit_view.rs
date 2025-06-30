@@ -4,7 +4,6 @@ use crate::{
     app::{App, Mode},
     components::component::Component,
     input::Action,
-    models::note::Note,
 };
 use ratatui::{
     layout::Rect,
@@ -26,9 +25,9 @@ impl Component for EditView {
     fn render(&mut self, f: &mut Frame, area: Rect, app: &App) {
         let title = match app.mode {
             Mode::AddTitle => "New Title",
-            Mode::AddContent => "New Content",
+            Mode::AddContent => "New Content (↵=newline, Ctrl+X=save, Esc=cancel)",
             Mode::EditTitle => "Edit Title",
-            Mode::EditContent => "Edit Content",
+            Mode::EditContent => "Edit Content (↵=newline, Ctrl+X=save, Esc=cancel)",
             _ => unreachable!(),
         };
 
@@ -49,21 +48,18 @@ impl Component for EditView {
             Action::Backspace => {
                 app.input.pop();
             }
+            Action::Save => {}
             Action::Enter => match app.mode {
                 Mode::AddTitle => {
                     app.buffer = app.input.clone();
                     app.input.clear();
                     app.mode = Mode::AddContent;
                 }
-                Mode::AddContent => {
-                    let note = Note::new(&app.buffer, &app.input);
-                    app.note_client.add_note(&note).unwrap();
-                    app.mode = Mode::List;
+                Mode::AddContent | Mode::EditContent => {
+                    app.input.push('\n');
                 }
                 Mode::EditTitle => {
-                    // Save edited title to buffer
                     app.buffer = app.input.clone();
-                    // Seed existing content into input
                     if let Some(id) = app.edit_id {
                         if let Ok(Some(n)) = app.note_client.get_note_by_id(id) {
                             app.input = n.content.clone();
@@ -75,20 +71,9 @@ impl Component for EditView {
                     }
                     app.mode = Mode::EditContent;
                 }
-                Mode::EditContent => {
-                    if let Some(id) = app.edit_id {
-                        if let Ok(Some(mut n)) = app.note_client.get_note_by_id(id) {
-                            n.title = app.buffer.clone();
-                            n.content = app.input.clone();
-                            app.note_client.update_note(&mut n).unwrap();
-                        }
-                    }
-                    app.mode = Mode::List;
-                }
                 _ => {}
             },
             Action::Esc => {
-                // go straight back to list
                 app.mode = Mode::List;
             }
             _ => {}
@@ -98,6 +83,7 @@ impl Component for EditView {
     fn focused(&self) -> bool {
         self.focus
     }
+
     fn set_focus(&mut self, focus: bool) {
         self.focus = focus;
     }

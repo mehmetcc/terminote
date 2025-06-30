@@ -1,5 +1,6 @@
 // src/controller.rs
 
+use crate::models::note::Note;
 use crate::{
     app::{App, Mode},
     components::{
@@ -24,7 +25,6 @@ pub fn run(
     list.set_focus(true);
 
     loop {
-        // DRAW
         terminal.draw(|f| {
             let area = f.area();
             if list.focused() {
@@ -33,21 +33,20 @@ pub fn run(
                 edit.render(f, area, app);
             } else if preview.focused() {
                 preview.render(f, area, app);
+            } else if confirm_deleting_changes.focused() {
+                confirm_deleting_changes.render(f, area, app);
             } else {
                 confirm_discarding_changes.render(f, area, app);
             }
         })?;
 
-        // INPUT
         if let Some(action) = poll_action() {
-            // LIST MODE
             if list.focused() {
                 match action {
                     Action::Char('q') => break,
                     Action::Char('a') => {
                         app.input.clear();
                         app.buffer.clear();
-                        app.mode = Mode::AddTitle;
                         app.mode = Mode::AddTitle;
                         list.set_focus(false);
                         edit.set_focus(true);
@@ -66,14 +65,11 @@ pub fn run(
                         let notes = app.note_client.get_all_notes().unwrap_or_default();
                         if let Some(n) = notes.get(app.selected) {
                             app.delete_id = Some(n.id);
-                            app.input = n.title.clone();
-                            app.mode = Mode::EditTitle;
                             list.set_focus(false);
                             confirm_deleting_changes.set_focus(true);
                         }
                     }
                     Action::Char('p') => {
-                        // load selected note into buffer (title) & input (content)
                         let notes = app.note_client.get_all_notes().unwrap_or_default();
                         if let Some(n) = notes.get(app.selected) {
                             app.buffer = n.title.clone();
@@ -83,22 +79,38 @@ pub fn run(
                             preview.set_focus(true);
                         }
                     }
-                    other => {
-                        list.handle(&other, app);
-                    }
+                    other => list.handle(&other, app),
                 }
                 continue;
             }
 
-            // EDIT MODE
-            // discard changes on Esc
             if edit.focused() {
+                if let Action::Save = action {
+                    match app.mode {
+                        Mode::AddContent => {
+                            let note = Note::new(&app.buffer, &app.input);
+                            app.note_client.add_note(&note)?;
+                        }
+                        Mode::EditContent => {
+                            if let Some(id) = app.edit_id {
+                                let mut n = app.note_client.get_note_by_id(id)?.unwrap();
+                                n.title = app.buffer.clone();
+                                n.content = app.input.clone();
+                                app.note_client.update_note(&mut n)?;
+                            }
+                        }
+                        _ => {}
+                    }
+                    app.mode = Mode::List;
+                    edit.set_focus(false);
+                    list.set_focus(true);
+                    continue;
+                }
                 if let Action::Esc = action {
                     edit.set_focus(false);
                     confirm_discarding_changes.set_focus(true);
                     continue;
                 }
-                // otherwise handle edit actions
                 edit.handle(&action, app);
                 if matches!(app.mode, Mode::List) {
                     edit.set_focus(false);
@@ -107,11 +119,8 @@ pub fn run(
                 continue;
             }
 
-            // PREVIEW MODE
             if preview.focused() {
-                // first let preview handle scroll
                 preview.handle(&action, app);
-                // esc returns to list immediately
                 if let Action::Esc = action {
                     preview.set_focus(false);
                     app.mode = Mode::List;
@@ -120,7 +129,6 @@ pub fn run(
                 continue;
             }
 
-            // CONFIRM DELETING MODE
             if confirm_deleting_changes.focused() {
                 confirm_deleting_changes.handle(&action, app);
                 if let Some(ok) = confirm_deleting_changes.take_result() {
@@ -128,7 +136,6 @@ pub fn run(
                     if ok {
                         if let Some(id) = app.delete_id.take() {
                             let _ = app.note_client.delete_note(id);
-                            // adjust selection
                             let len = app.note_client.get_all_notes().unwrap_or_default().len();
                             if app.selected >= len && len > 0 {
                                 app.selected = len - 1;
@@ -137,7 +144,6 @@ pub fn run(
                         app.mode = Mode::List;
                         list.set_focus(true);
                     } else {
-                        // cancel deletion, back to list
                         app.mode = Mode::List;
                         list.set_focus(true);
                     }
@@ -145,7 +151,6 @@ pub fn run(
                 continue;
             }
 
-            // CONFIRM DISCARDING CHANGES MODE
             if confirm_discarding_changes.focused() {
                 confirm_discarding_changes.handle(&action, app);
                 if let Some(ok) = confirm_discarding_changes.take_result() {
