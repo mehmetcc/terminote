@@ -2,9 +2,9 @@
 
 use crate::{app::App, components::component::Component, input::Action};
 use ratatui::{
-    Frame,
     layout::Rect,
     widgets::{Block, Borders, Paragraph},
+    Frame,
 };
 
 pub struct ConfirmDialog {
@@ -31,7 +31,6 @@ impl ConfirmDialog {
 
 impl Component for ConfirmDialog {
     fn render(&mut self, f: &mut Frame, area: Rect, _app: &App) {
-        // Build a two‐line message: your prompt, then the options
         let text = format!("{}\n\n(o = yes, x = no)", self.prompt);
 
         let p = Paragraph::new(text).block(Block::default().borders(Borders::ALL).title("Confirm"));
