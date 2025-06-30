@@ -18,7 +18,7 @@ pub fn run(
     let mut list = ListView::new();
     let mut edit = EditView::new();
     let mut preview = MarkdownView::new();
-    let mut confirm = ConfirmDialog::new("Discard changes?");
+    let mut confirm_discarding_changes = ConfirmDialog::new("Discard changes?");
 
     list.set_focus(true);
 
@@ -33,7 +33,7 @@ pub fn run(
             } else if preview.focused() {
                 preview.render(f, area, app);
             } else {
-                confirm.render(f, area, app);
+                confirm_discarding_changes.render(f, area, app);
             }
         })?;
 
@@ -81,7 +81,7 @@ pub fn run(
             if edit.focused() {
                 if let Action::Esc = action {
                     edit.set_focus(false);
-                    confirm.set_focus(true);
+                    confirm_discarding_changes.set_focus(true);
                     continue;
                 }
                 // otherwise handle edit actions
@@ -107,10 +107,10 @@ pub fn run(
             }
 
             // CONFIRM MODE
-            if confirm.focused() {
-                confirm.handle(&action, app);
-                if let Some(ok) = confirm.take_result() {
-                    confirm.set_focus(false);
+            if confirm_discarding_changes.focused() {
+                confirm_discarding_changes.handle(&action, app);
+                if let Some(ok) = confirm_discarding_changes.take_result() {
+                    confirm_discarding_changes.set_focus(false);
                     if ok {
                         app.input.clear();
                         app.buffer.clear();

@@ -100,4 +100,9 @@ impl NoteClient {
             .collect::<Result<_, _>>()?;
         Ok(notes)
     }
+
+    pub fn delete_note(&self, id: Uuid) -> Result<usize, rusqlite::Error> {
+        self.connection
+            .execute("DELETE FROM notes WHERE id = ?1", params![id])
+    }
 }
