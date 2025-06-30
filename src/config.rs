@@ -1,3 +1,5 @@
+// src/config.rs
+
 use std::path::PathBuf;
 
 use config::{Config, ConfigError, File};
