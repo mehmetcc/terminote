@@ -77,7 +77,14 @@ pub fn run(
             }
 
             // EDIT MODE
+            // discard changes on Esc
             if edit.focused() {
+                if let Action::Esc = action {
+                    edit.set_focus(false);
+                    confirm.set_focus(true);
+                    continue;
+                }
+                // otherwise handle edit actions
                 edit.handle(&action, app);
                 if matches!(app.mode, Mode::List) {
                     edit.set_focus(false);

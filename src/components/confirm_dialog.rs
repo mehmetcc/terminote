@@ -31,11 +31,10 @@ impl ConfirmDialog {
 
 impl Component for ConfirmDialog {
     fn render(&mut self, f: &mut Frame, area: Rect, _app: &App) {
-        let p = Paragraph::new(self.prompt.as_str()).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Confirm (o/x)"),
-        );
+        // Build a two‐line message: your prompt, then the options
+        let text = format!("{}\n\n(o = yes, x = no)", self.prompt);
+
+        let p = Paragraph::new(text).block(Block::default().borders(Borders::ALL).title("Confirm"));
         f.render_widget(p, area);
     }
 
@@ -43,10 +42,10 @@ impl Component for ConfirmDialog {
         if !self.focus {
             return;
         }
-        if let Action::Char('o') = action {
-            self.result = Some(true);
-        } else if let Action::Char('x') = action {
-            self.result = Some(false);
+        match action {
+            Action::Char('o') => self.result = Some(true),
+            Action::Char('x') => self.result = Some(false),
+            _ => {}
         }
     }
 
