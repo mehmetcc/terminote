@@ -5,24 +5,78 @@ use crate::{
     components::component::Component,
     input::Action,
 };
+use ratatui::widgets::Wrap;
 use ratatui::{
-    layout::Rect,
-    widgets::{Block, Borders, Paragraph},
+    backend::Backend,
+    layout::{Position, Rect},
+    widgets::{Block, Borders, Paragraph}
+    ,
     Frame,
 };
+use std::cmp::{max, min};
 
 pub struct EditView {
     focus: bool,
+    scroll: usize,
 }
 
 impl EditView {
     pub fn new() -> Self {
-        Self { focus: false }
+        Self {
+            focus: false,
+            scroll: 0,
+        }
+    }
+
+    fn compute_cursor(&self, area: Rect, input: &str) -> Position {
+        let width = area.width.saturating_sub(2) as usize;
+        let mut row = 0usize;
+        let mut col = 0usize;
+
+        for ch in input.chars() {
+            if ch == '\n' {
+                row += 1;
+                col = 0;
+            } else {
+                // wrap if we'd exceed the inner width
+                if col >= width {
+                    row += 1;
+                    col = 0;
+                }
+                col += 1;
+            }
+        }
+
+        // clamp to the inner box
+        let max_rows = area.height.saturating_sub(2) as usize;
+        if row > max_rows {
+            row = max_rows;
+        }
+        let max_cols = width;
+        if col > max_cols {
+            col = max_cols;
+        }
+
+        let x = area.x + 1 + col as u16;
+        let y = area.y + 1 + row as u16;
+        Position::new(x, y)
+    }
+
+    fn scroll_down(&mut self, app: &App, area: Rect) {
+        let max_scroll = max(
+            0,
+            app.input.lines().count() as usize - area.height as usize + 2,
+        );
+        self.scroll = min(self.scroll + 1, max_scroll);
+    }
+
+    fn scroll_up(&mut self) {
+        self.scroll = self.scroll.saturating_sub(1);
     }
 }
 
 impl Component for EditView {
-    fn render(&mut self, f: &mut Frame, area: Rect, app: &App) {
+    fn render(&mut self, f: &mut Frame<'_>, area: Rect, app: &App) {
         let title = match app.mode {
             Mode::AddTitle => "New Title",
             Mode::AddContent => "New Content (↵=newline, Ctrl+X=save, Esc=cancel)",
@@ -31,9 +85,19 @@ impl Component for EditView {
             _ => unreachable!(),
         };
 
-        let p = Paragraph::new(app.input.as_str())
-            .block(Block::default().borders(Borders::ALL).title(title));
-        f.render_widget(p, area);
+        let block = Block::default().borders(Borders::ALL).title(title);
+
+        let paragraph = Paragraph::new(app.input.as_str())
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((self.scroll as u16, 0));
+
+        f.render_widget(paragraph, area);
+
+        if self.focus {
+            let position = self.compute_cursor(area, &app.input);
+            f.set_cursor_position(position);
+        }
     }
 
     fn handle(&mut self, action: &Action, app: &mut App) {
