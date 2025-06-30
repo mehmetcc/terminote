@@ -7,10 +7,10 @@ use crate::{
 };
 use ratatui::widgets::Wrap;
 use ratatui::{
+    Frame,
     backend::Backend,
     layout::{Position, Rect},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 use std::cmp::{max, min};
 
@@ -88,20 +88,6 @@ impl EditView {
             app.input.clear();
         }
         app.mode = Mode::EditContent;
-    }
-
-    // TODO: I can't make these work with the current setup
-    // TODO: So, maybe think of cleaning this up
-    fn scroll_down(&mut self, app: &App, area: Rect) {
-        let max_scroll = max(
-            0,
-            app.input.lines().count() as usize - area.height as usize + 2,
-        );
-        self.scroll = min(self.scroll + 1, max_scroll);
-    }
-
-    fn scroll_up(&mut self) {
-        self.scroll = self.scroll.saturating_sub(1);
     }
 }
 
