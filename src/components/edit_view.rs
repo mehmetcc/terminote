@@ -9,8 +9,7 @@ use ratatui::widgets::Wrap;
 use ratatui::{
     backend::Backend,
     layout::{Position, Rect},
-    widgets::{Block, Borders, Paragraph}
-    ,
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 use std::cmp::{max, min};
@@ -62,6 +61,37 @@ impl EditView {
         Position::new(x, y)
     }
 
+    fn handle_enter(&mut self, app: &mut App) {
+        match app.mode {
+            Mode::AddTitle => self.handle_add_title(app),
+            Mode::AddContent | Mode::EditContent => app.input.push('\n'),
+            Mode::EditTitle => self.handle_edit_title(app),
+            _ => {}
+        }
+    }
+
+    fn handle_add_title(&mut self, app: &mut App) {
+        app.buffer = app.input.clone();
+        app.input.clear();
+        app.mode = Mode::AddContent;
+    }
+
+    fn handle_edit_title(&mut self, app: &mut App) {
+        app.buffer = app.input.clone();
+        if let Some(id) = app.edit_id {
+            if let Ok(Some(n)) = app.note_client.get_note_by_id(id) {
+                app.input = n.content.clone();
+            } else {
+                app.input.clear();
+            }
+        } else {
+            app.input.clear();
+        }
+        app.mode = Mode::EditContent;
+    }
+
+    // TODO: I can't make these work with the current setup
+    // TODO: So, maybe think of cleaning this up
     fn scroll_down(&mut self, app: &App, area: Rect) {
         let max_scroll = max(
             0,
@@ -106,40 +136,13 @@ impl Component for EditView {
         }
 
         match action {
-            Action::Char(c) => {
-                app.input.push(*c);
-            }
+            Action::Char(c) => app.input.push(*c),
             Action::Backspace => {
                 app.input.pop();
             }
             Action::Save => {}
-            Action::Enter => match app.mode {
-                Mode::AddTitle => {
-                    app.buffer = app.input.clone();
-                    app.input.clear();
-                    app.mode = Mode::AddContent;
-                }
-                Mode::AddContent | Mode::EditContent => {
-                    app.input.push('\n');
-                }
-                Mode::EditTitle => {
-                    app.buffer = app.input.clone();
-                    if let Some(id) = app.edit_id {
-                        if let Ok(Some(n)) = app.note_client.get_note_by_id(id) {
-                            app.input = n.content.clone();
-                        } else {
-                            app.input.clear();
-                        }
-                    } else {
-                        app.input.clear();
-                    }
-                    app.mode = Mode::EditContent;
-                }
-                _ => {}
-            },
-            Action::Esc => {
-                app.mode = Mode::List;
-            }
+            Action::Enter => self.handle_enter(app),
+            Action::Esc => app.mode = Mode::List,
             _ => {}
         }
     }
