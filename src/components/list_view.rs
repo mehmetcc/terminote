@@ -33,7 +33,7 @@ impl Component for ListView {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title("Notes (a:add, e:edit, p:preview, q:quit)"),
+                    .title("Notes (a:add, e:edit, p:preview, d: delete, q:quit)"),
             )
             .highlight_symbol("➤ ");
 

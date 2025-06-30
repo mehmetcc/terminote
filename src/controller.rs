@@ -19,6 +19,7 @@ pub fn run(
     let mut edit = EditView::new();
     let mut preview = MarkdownView::new();
     let mut confirm_discarding_changes = ConfirmDialog::new("Discard changes?");
+    let mut confirm_deleting_changes = ConfirmDialog::new("Delete note?");
 
     list.set_focus(true);
 
@@ -44,6 +45,9 @@ pub fn run(
                 match action {
                     Action::Char('q') => break,
                     Action::Char('a') => {
+                        app.input.clear();
+                        app.buffer.clear();
+                        app.mode = Mode::AddTitle;
                         app.mode = Mode::AddTitle;
                         list.set_focus(false);
                         edit.set_focus(true);
@@ -56,6 +60,16 @@ pub fn run(
                             app.mode = Mode::EditTitle;
                             list.set_focus(false);
                             edit.set_focus(true);
+                        }
+                    }
+                    Action::Char('d') => {
+                        let notes = app.note_client.get_all_notes().unwrap_or_default();
+                        if let Some(n) = notes.get(app.selected) {
+                            app.delete_id = Some(n.id);
+                            app.input = n.title.clone();
+                            app.mode = Mode::EditTitle;
+                            list.set_focus(false);
+                            confirm_deleting_changes.set_focus(true);
                         }
                     }
                     Action::Char('p') => {
@@ -106,7 +120,32 @@ pub fn run(
                 continue;
             }
 
-            // CONFIRM MODE
+            // CONFIRM DELETING MODE
+            if confirm_deleting_changes.focused() {
+                confirm_deleting_changes.handle(&action, app);
+                if let Some(ok) = confirm_deleting_changes.take_result() {
+                    confirm_deleting_changes.set_focus(false);
+                    if ok {
+                        if let Some(id) = app.delete_id.take() {
+                            let _ = app.note_client.delete_note(id);
+                            // adjust selection
+                            let len = app.note_client.get_all_notes().unwrap_or_default().len();
+                            if app.selected >= len && len > 0 {
+                                app.selected = len - 1;
+                            }
+                        }
+                        app.mode = Mode::List;
+                        list.set_focus(true);
+                    } else {
+                        // cancel deletion, back to list
+                        app.mode = Mode::List;
+                        list.set_focus(true);
+                    }
+                }
+                continue;
+            }
+
+            // CONFIRM DISCARDING CHANGES MODE
             if confirm_discarding_changes.focused() {
                 confirm_discarding_changes.handle(&action, app);
                 if let Some(ok) = confirm_discarding_changes.take_result() {

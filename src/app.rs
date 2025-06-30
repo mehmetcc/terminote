@@ -19,11 +19,11 @@ pub struct App {
     pub input: String,
     pub buffer: String,
     pub edit_id: Option<Uuid>,
+    pub delete_id: Option<Uuid>,
     pub note_client: NoteClient,
 }
 
 impl App {
-    /// Construct with your NoteClient
     pub fn new(note_client: NoteClient) -> Self {
         let mut ls = ListState::default();
         ls.select(Some(0));
@@ -34,6 +34,7 @@ impl App {
             input: String::new(),
             buffer: String::new(),
             edit_id: None,
+            delete_id: None,
             note_client,
         }
     }
