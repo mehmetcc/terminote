@@ -1,87 +1,123 @@
 // src/controller.rs
+
 use crate::{
     app::{App, Mode},
-    db::NoteClient,
-    input::{Action, poll_action},
-    ui,
+    components::{
+        component::Component, confirm_dialog::ConfirmDialog, edit_view::EditView,
+        list_view::ListView, markdown_view::MarkdownView,
+    },
+    input::{poll_action, Action},
 };
-use ratatui::Terminal;
-use ratatui::backend::CrosstermBackend;
-use std::error::Error;
-use std::io::Stdout;
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::{error::Error, io::Stdout};
 
 pub fn run(
     app: &mut App,
-    client: NoteClient,
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 ) -> Result<(), Box<dyn Error>> {
-    loop {
-        // keep selection in sync
-        app.state.select(Some(app.selected));
+    let mut list = ListView::new();
+    let mut edit = EditView::new();
+    let mut preview = MarkdownView::new();
+    let mut confirm = ConfirmDialog::new("Discard changes?");
 
+    list.set_focus(true);
+
+    loop {
+        // DRAW
         terminal.draw(|f| {
             let area = f.area();
-            if matches!(app.mode, Mode::List) {
-                ui::list_view::render(f, area, app);
+            if list.focused() {
+                list.render(f, area, app);
+            } else if edit.focused() {
+                edit.render(f, area, app);
+            } else if preview.focused() {
+                preview.render(f, area, app);
             } else {
-                ui::edit_view::render(f, area, app);
+                confirm.render(f, area, app);
             }
         })?;
 
+        // INPUT
         if let Some(action) = poll_action() {
-            match action {
-                Action::Quit => break,
-                Action::Up => app.selected = app.selected.saturating_sub(1),
-                Action::Down => {
-                    if app.selected + 1 < app.notes.len() {
-                        app.selected += 1
+            // LIST MODE
+            if list.focused() {
+                match action {
+                    Action::Char('q') => break,
+                    Action::Char('a') => {
+                        app.mode = Mode::AddTitle;
+                        list.set_focus(false);
+                        edit.set_focus(true);
                     }
-                }
-                Action::Add => app.mode = Mode::AddTitle,
-                Action::Edit => {
-                    if let Some(n) = app.notes.get(app.selected) {
-                        app.edit_id = Some(n.id);
-                        app.input = n.title.clone();
-                        app.mode = Mode::EditTitle;
-                    }
-                }
-                Action::Confirm => match app.mode {
-                    Mode::AddTitle => {
-                        app.buffer = app.input.clone();
-                        app.input.clear();
-                        app.mode = Mode::AddContent;
-                    }
-                    Mode::AddContent => {
-                        let note = crate::note::Note::new(&app.buffer, &app.input);
-                        client.add_note(&note)?;
-                        app.notes = client.get_all_notes()?;
-                        app.mode = Mode::List;
-                    }
-                    Mode::EditTitle => {
-                        app.buffer = app.input.clone();
-                        app.input.clear();
-                        app.mode = Mode::EditContent;
-                    }
-                    Mode::EditContent => {
-                        if let Some(id) = app.edit_id {
-                            if let Some(mut note) = app.notes.iter_mut().find(|n| n.id == id) {
-                                note.title = app.buffer.clone();
-                                note.content = app.input.clone();
-                                client.update_note(&mut note)?;
-                                app.notes = client.get_all_notes()?;
-                            }
+                    Action::Char('e') => {
+                        let notes = app.note_client.get_all_notes().unwrap_or_default();
+                        if let Some(n) = notes.get(app.selected) {
+                            app.edit_id = Some(n.id);
+                            app.input = n.title.clone();
+                            app.mode = Mode::EditTitle;
+                            list.set_focus(false);
+                            edit.set_focus(true);
                         }
-                        app.mode = Mode::List;
                     }
-                    _ => {}
-                },
-                Action::Cancel => app.mode = Mode::List,
-                Action::InsertChar(c) => app.input.push(c),
-                Action::Backspace => {
-                    app.input.pop();
+                    Action::Char('p') => {
+                        // load selected note into buffer (title) & input (content)
+                        let notes = app.note_client.get_all_notes().unwrap_or_default();
+                        if let Some(n) = notes.get(app.selected) {
+                            app.buffer = n.title.clone();
+                            app.input = n.content.clone();
+                            app.mode = Mode::EditContent;
+                            list.set_focus(false);
+                            preview.set_focus(true);
+                        }
+                    }
+                    other => {
+                        list.handle(&other, app);
+                    }
                 }
+                continue;
+            }
+
+            // EDIT MODE
+            if edit.focused() {
+                edit.handle(&action, app);
+                if matches!(app.mode, Mode::List) {
+                    edit.set_focus(false);
+                    list.set_focus(true);
+                }
+                continue;
+            }
+
+            // PREVIEW MODE
+            if preview.focused() {
+                // first let preview handle scroll
+                preview.handle(&action, app);
+                // esc returns to list immediately
+                if let Action::Esc = action {
+                    preview.set_focus(false);
+                    app.mode = Mode::List;
+                    list.set_focus(true);
+                }
+                continue;
+            }
+
+            // CONFIRM MODE
+            if confirm.focused() {
+                confirm.handle(&action, app);
+                if let Some(ok) = confirm.take_result() {
+                    confirm.set_focus(false);
+                    if ok {
+                        app.input.clear();
+                        app.buffer.clear();
+                        app.mode = Mode::List;
+                        list.set_focus(true);
+                    } else {
+                        app.mode = Mode::EditContent;
+                        edit.set_focus(true);
+                    }
+                }
+                continue;
             }
         }
     }
+
     Ok(())
 }

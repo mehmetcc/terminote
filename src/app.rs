@@ -1,7 +1,7 @@
 // src/app.rs
 
+use crate::db::NoteClient;
 use ratatui::widgets::ListState;
-use crate::note::Note;
 use uuid::Uuid;
 
 pub enum Mode {
@@ -13,27 +13,28 @@ pub enum Mode {
 }
 
 pub struct App {
-    pub notes: Vec<Note>,
     pub selected: usize,
     pub state: ListState,
     pub mode: Mode,
     pub input: String,
     pub buffer: String,
     pub edit_id: Option<Uuid>,
+    pub note_client: NoteClient,
 }
 
 impl App {
-    pub fn new() -> Self {
+    /// Construct with your NoteClient
+    pub fn new(note_client: NoteClient) -> Self {
         let mut ls = ListState::default();
         ls.select(Some(0));
         App {
-            notes: Vec::new(),
             selected: 0,
             state: ls,
             mode: Mode::List,
             input: String::new(),
             buffer: String::new(),
             edit_id: None,
+            note_client,
         }
     }
 }

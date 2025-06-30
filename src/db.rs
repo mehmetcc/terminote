@@ -1,8 +1,8 @@
 // src/db.rs
 
-use crate::note::Note;
+use crate::models::note::Note;
 use chrono::Utc;
-use rusqlite::{Connection, Row, params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 use uuid::Uuid;
 
 pub struct NoteClient {

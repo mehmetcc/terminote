@@ -1,4 +1,4 @@
-// src/note.rs
+// src/models/note.rs
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;

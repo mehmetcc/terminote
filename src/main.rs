@@ -12,12 +12,12 @@ use rusqlite::Connection;
 use std::{error::Error, io};
 
 mod app;
+mod components;
 mod config;
 mod controller;
 mod db;
 mod input;
-mod note;
-mod ui;
+mod models;
 
 fn main() {
     if let Err(e) = run() {
@@ -27,19 +27,24 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
+    // Create data path if it doesn't exist
     let settings = config::Settings::new("Settings.toml")?;
-    let conn = Connection::open(settings.db_path())?;
-    let client = db::NoteClient::new(conn)?;
-    let mut app = app::App::new();
-    app.notes = client.get_all_notes()?;
+    create_data_path(&settings.store.path)?;
+    let connection = Connection::open(settings.db_path())?;
+    let client = db::NoteClient::new(connection)?;
+    let mut app = app::App::new(client);
 
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     let _cleanup = TerminalCleanupGuard::new()?;
-    controller::run(&mut app, client, &mut terminal)?;
+    controller::run(&mut app, &mut terminal)?;
 
     Ok(())
+}
+
+fn create_data_path(path: &str) -> std::io::Result<()> {
+    std::fs::create_dir_all(path)
 }
 
 pub struct TerminalCleanupGuard {
@@ -59,6 +64,7 @@ impl TerminalCleanupGuard {
 impl Drop for TerminalCleanupGuard {
     fn drop(&mut self) {
         // best‐effort cleanup
+        // YAAAK GEL BİLDİĞİN NE VARSA YOK GEEL GÖZÜM YOK PARA PULDA
         let _ = disable_raw_mode();
         let _ = execute!(self.stdout, LeaveAlternateScreen, DisableMouseCapture, Show);
     }
